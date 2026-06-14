@@ -101,7 +101,7 @@ public class MainVideo extends JFrame{
                     // Will store all the points that are graphed
                     List<MatOfPoint> contours = new ArrayList<>();
 
-                    // Morph_Rect, in order to create a rectangular Kernel space and Morph_close to
+                    // Morph_Rect, in order to create a rectangular Kernel space and Morph_close to erase noise
                     Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5,5));
                     Imgproc.morphologyEx(edgeScale,edgeScale,Imgproc.MORPH_CLOSE,kernel);
 
@@ -184,7 +184,8 @@ public class MainVideo extends JFrame{
                     // Saves current GrayScale Image
                     if(saved){
                         System.out.println("SAVING IMAGE: " + liveCounter);
-                        Imgcodecs.imwrite("Images\\Image"+ liveCounter+ ".jpg",grayScale);
+                        Imgcodecs.imwrite("Images\\Image"+ liveCounter+ ".jpg",mats);
+                        Imgcodecs.imwrite("Images\\ImageGray"+ liveCounter+ ".jpg",grayScale);
                         liveCounter++;
                         saved = false;
                     }
