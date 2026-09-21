@@ -3,6 +3,7 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
 import org.opencv.core.Point;
+import org.opencv.imgproc.CLAHE;
 
 import javax.sound.sampled.Line;
 import javax.swing.*;
@@ -29,7 +30,7 @@ public class MainVideo extends JFrame{
 
     private static boolean saved = false; // One image saved instead of 100 in one press
 
-    private static final double MIN_AREA = 100;
+    private static final double MIN_AREA = 5000; // subject to change for webcam resolution
 
     public MainVideo(){
         panel = new JPanel();
@@ -89,20 +90,37 @@ public class MainVideo extends JFrame{
             System.out.println("In thread");
             MatOfByte matB = new MatOfByte(); // turns Mat into bytes
             MatOfByte matGray = new MatOfByte();
+
+            //only needs to be created once
+            CLAHE clahe = Imgproc.createCLAHE(2.0, new Size(8,8));
+
+            // Morph_Rect, in order to create a rectangular Kernel space and Morph_close to erase noise
+            Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9,9));
             while(vid.isOpened()){
                 if(vid.read(mats)){
 
                     Core.flip(mats,mats,+1); // flips image as a reflection instead of inverted
                     Imgproc.cvtColor(mats,grayScale,Imgproc.COLOR_BGR2GRAY);
+                    clahe.apply(grayScale, grayScale);
                     Imgproc.GaussianBlur(grayScale,blurScale,new Size(5,5),0);
-                    Imgproc.Canny(blurScale,edgeScale,40,120);
+
+                    MatOfDouble mean = new MatOfDouble();
+                    MatOfDouble stddev = new MatOfDouble();
+                    Core.meanStdDev(blurScale, mean, stddev);
+                    double median = mean.get(0,0)[0]; // approx; for true median you'd sort pixel values
+                    double sigma = 0.33;
+                    double lower = Math.max(0, (1.0 - sigma) * median); // lower bound for brightness
+                    double upper = Math.min(255, (1.0 + sigma) * median); // upper bound for brightness
+                    System.out.println("lower: " + lower + " upper: " + upper);
+
+                    Imgproc.Canny(blurScale,edgeScale,lower,upper);
                     System.out.println("loading");
 
                     // Will store all the points that are graphed
                     List<MatOfPoint> contours = new ArrayList<>();
 
-                    // Morph_Rect, in order to create a rectangular Kernel space and Morph_close to erase noise
-                    Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5,5));
+
+                    Imgproc.dilate(edgeScale, edgeScale, kernel); // increase size to kernel in order to avoid finger blocking
                     Imgproc.morphologyEx(edgeScale,edgeScale,Imgproc.MORPH_CLOSE,kernel);
 
                     Mat hierarchy = new Mat();
@@ -125,8 +143,8 @@ public class MainVideo extends JFrame{
                         MatOfPoint approxInt = new MatOfPoint();
                         approx.convertTo(approxInt, CvType.CV_32S);
 
-                        Rect rectBound = Imgproc.boundingRect(approx);
-                        double rectArea = rectBound.height * rectBound.width;
+                        RotatedRect rectBound = Imgproc.minAreaRect(approx);
+                        double rectArea = rectBound.size.height * rectBound.size.width;
 
                         System.out.println("APPROX TOTAL : " + approx.total());
 
@@ -141,9 +159,9 @@ public class MainVideo extends JFrame{
                             Point[] points = approx.toArray();
                             int edgeCounter = 0;
                             for(int i = 0; i < points.length; i++){
-                                Point pointA = points[(i-1 + 4)%4];
+                                Point pointA = points[(i-1 + 4)%points.length];
                                 Point pointB = points[i];
-                                Point pointC = points[(i+1 + 4)%4];
+                                Point pointC = points[(i+1 + 4)%points.length];
 
                                 Point vectorAB = new Point(pointA.x-pointB.x,pointA.y-pointB.y);
                                 Point vectorCB = new Point(pointC.x-pointB.x, pointC.y-pointB.y);
@@ -153,7 +171,7 @@ public class MainVideo extends JFrame{
 
                                 double dotProd = (vectorCB.x * vectorAB.x)+(vectorCB.y * vectorAB.y);
                                 double discrepancy = dotProd/(lengthAB * lengthCB);
-                                if(discrepancy <= .15){
+                                if(Math.abs(discrepancy) <= .15){
                                     edgeCounter++;
                                 }
                                 System.out.println("Discrepancy value" + discrepancy);
@@ -164,8 +182,15 @@ public class MainVideo extends JFrame{
 //                            double fillArea = actualArea/rectArea;
 
                             if(Imgproc.isContourConvex(approxInt) && isPerp) {
-                                Imgproc.drawContours(mats,validContour, 0, new Scalar(0, 0, 255));
-                                Imgproc.rectangle(mats, rectBound, new Scalar(255, 0, 0),5);
+                                Point[] boxPoints = new Point[4];
+                                rectBound.points(boxPoints); // fills the array with the 4 corners of the rotated box
+
+                                MatOfPoint boxMat = new MatOfPoint(boxPoints);
+                                List<MatOfPoint> boxList = new ArrayList<>();
+                                boxList.add(boxMat);
+
+                                // Can now do rotated boxes
+                                Imgproc.drawContours(mats,boxList, 0, new Scalar(0, 0, 255));
                             }
                         }
                     }
