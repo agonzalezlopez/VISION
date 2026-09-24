@@ -9,38 +9,42 @@ import java.awt.*;
 
 
 public class MainVideo extends JFrame{
-    private static JPanel panel;
-    private static JLabel cam;
-    private static JLabel cam2;
+    private static JPanel cam;
+    private static JPanel cam2; // This will be GreyScale
 
     private static VideoCapture vid; // live camera feed
 
     public MainVideo(){
-        panel = new JPanel();
-        panel.setComponentOrientation(ComponentOrientation.LEFT_TO_RIGHT);
-        panel.setLayout(new GridLayout(2,2,10,10));
+        cam = new JPanel();
+        cam2 = new JPanel();
+        //Insert the Panels using util
 
-
-        cam = new JLabel("cam1",SwingConstants.CENTER);
-        cam.setSize(150,150);
-        cam.setVisible(true);
-
-        cam2 = new JLabel("cam2",SwingConstants.CENTER);
-        cam2.setSize(150,150);
-        cam2.setVisible(true);
-
+        VideoCapture stream = new VideoCapture(0);
 
     }
 
+    private static Runnable runHelper(final JPanel cameraF, final JPanel processedF, VideoCapture liveCam){
+        return () -> {
+            Mat frame = new Mat();
+            while(true){
+                liveCam.read(frame);
 
-    private static void Run(){
+                Mat processed = new Mat();
+                // Util function to processImg
+                // Util function to mark outer contour
+                // drawImage from frame to cameraFeed
+                // Draw processed Mat onto processed Feed cam/panel
+            }
+        };
+    }
+    private static void runs(Runnable detectionFunc){
 
     }
+
 
     public static void main(String[] args){
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
         MainVideo vid = new MainVideo();
-        MainVideo.Run();
 
         System.out.println("loaded");
     }
