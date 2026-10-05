@@ -1,6 +1,13 @@
 import org.opencv.core.*;
+import org.opencv.core.Point;
 import org.opencv.imgproc.Imgproc;
 
+import javax.swing.*;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.awt.image.WritableRaster;
+import java.io.BufferedWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,7 +28,7 @@ public class MainVideo_Utils {
         Imgproc.cvtColor(processedMat,processedMat,Imgproc.COLOR_RGB2GRAY);
 
         //Canny detection to track edges
-        Imgproc.Canny(processedMat,processedMat,200,25);
+        Imgproc.Canny(processedMat,processedMat,50,200);
 
         //Dilate to erase gaps in img, use 3x3 (new Mat creates this kernel) and (-1,-1) default values for now
         //only one iteration of dilation per func call
@@ -30,7 +37,7 @@ public class MainVideo_Utils {
         return processedMat;
     }
 
-    public static boolean markEdgeContours(final Mat processsedMat, final Mat originalMat){
+    public static void markEdgeContours(final Mat processsedMat, final Mat originalMat){
         ArrayList<MatOfPoint> allcontours = new ArrayList<>();
 
         //Finds contours using kernel and uses uncompressed data(use chain simple later)
@@ -52,12 +59,34 @@ public class MainVideo_Utils {
                         Imgproc.approxPolyDP(distance,distance,0.02*Imgproc.arcLength(distance,true),true);
 
                         //apply put text feature here
+                        Imgproc.putText(originalMat,"Pts: " + distance.toArray().length,
+                                new Point(boundingRect.x + boundingRect.width, boundingRect.y + boundingRect.height),2,1,new Scalar(0,0,255));
                     }
 
                     return isNoise;
                 }).toList();
 
-        return false;
+        Imgproc.drawContours(originalMat,filterContours,-1,new Scalar(255,0,0),1);
     }
+
+    public static void drawImg(final Mat processed, JPanel cam){
+        BufferedImage buff = matToBuff(processed);
+        Graphics graphic = cam.getGraphics();
+        graphic.drawImage(buff,0,0,cam);
+    }
+
+    public static BufferedImage matToBuff(final Mat processed){
+        BufferedImage buffValues = new BufferedImage(processed.width(),processed.height(),processed.channels() == 1? BufferedImage.TYPE_BYTE_GRAY : BufferedImage.TYPE_3BYTE_BGR);
+
+        //writes pixels in img
+        final WritableRaster raster = buffValues.getRaster();
+
+        DataBufferByte bufferByte = (DataBufferByte) raster.getDataBuffer();
+
+        processed.get(0,0, bufferByte.getData());
+
+        return buffValues;
+    }
+
 
 }
