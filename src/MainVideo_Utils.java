@@ -25,10 +25,10 @@ public class MainVideo_Utils {
         Imgproc.blur(unprocessedMat,processedMat,new Size(7,7));
 
         //Greyscale Img
-        Imgproc.cvtColor(processedMat,processedMat,Imgproc.COLOR_RGB2GRAY);
+        Imgproc.cvtColor(processedMat,processedMat,Imgproc.COLOR_BGR2GRAY);
 
         //Canny detection to track edges
-        Imgproc.Canny(processedMat,processedMat,50,200);
+        Imgproc.Canny(processedMat,processedMat,60,90);
 
         //Dilate to erase gaps in img, use 3x3 (new Mat creates this kernel) and (-1,-1) default values for now
         //only one iteration of dilation per func call
@@ -41,38 +41,48 @@ public class MainVideo_Utils {
         ArrayList<MatOfPoint> allcontours = new ArrayList<>();
 
         //Finds contours using kernel and uses uncompressed data(use chain simple later)
-        Imgproc.findContours(processsedMat,allcontours,new Mat(processsedMat.rows(),processsedMat.cols(),processsedMat.type()),Imgproc.RETR_EXTERNAL,Imgproc.CHAIN_APPROX_NONE);
+        Mat hierarchy = new Mat();
+        Imgproc.findContours(processsedMat,allcontours,hierarchy,Imgproc.RETR_EXTERNAL,Imgproc.CHAIN_APPROX_NONE);
 
         // fucntion that returns true or false given that it contains only contours,
         // the boolean is determined through a test ()
         final List<MatOfPoint> filterContours = allcontours.stream()
                 .filter(contour -> {
+                    List<Point> corners = new ArrayList<>();
                     double contourArea = Imgproc.contourArea(contour);
                     Rect boundingRect = Imgproc.boundingRect(contour);
 
                     boolean isNoise = (contourArea>=1000);
+                    boolean isApprox = false;
                     if(isNoise){
                         Imgproc.putText(originalMat,"Area: " + contourArea,
                                 new Point(boundingRect.x + boundingRect.width, boundingRect.y + boundingRect.height),2,2,new Scalar(0,0,255));
                         MatOfPoint2f distance = new MatOfPoint2f();
+                        MatOfPoint2f approx = new MatOfPoint2f();
                         contour.convertTo(distance,CvType.CV_32F);
-                        Imgproc.approxPolyDP(distance,distance,0.02*Imgproc.arcLength(distance,true),true);
-
+                        Imgproc.approxPolyDP(distance,approx,0.02*Imgproc.arcLength(distance,true),true);
+                        isApprox = (4<=approx.total() && approx.total() <= 6);
                         //apply put text feature here
-                        Imgproc.putText(originalMat,"Pts: " + distance.toArray().length,
-                                new Point(boundingRect.x + boundingRect.width, boundingRect.y + boundingRect.height),2,1,new Scalar(0,0,255));
+                        Imgproc.putText(originalMat,"Pts: " + approx.toArray().length,
+                                new Point(boundingRect.x + boundingRect.width, boundingRect.y + boundingRect.height+50),2,1,new Scalar(0,0,255));
+
+                        if(isApprox){
+                            for(Point p : approx.toArray()){
+                                corners.add(p);
+                            }
+                        }
                     }
 
-                    return isNoise;
+                    return isNoise && isApprox;
                 }).toList();
 
         Imgproc.drawContours(originalMat,filterContours,-1,new Scalar(255,0,0),1);
     }
 
-    public static void drawImg(final Mat processed, JPanel cam){
+    public static void drawImg(final Mat processed, JLabel cam){
         BufferedImage buff = matToBuff(processed);
-        Graphics graphic = cam.getGraphics();
-        graphic.drawImage(buff,0,0,cam);
+        ImageIcon icon = new ImageIcon(buff);
+        SwingUtilities.invokeLater(() -> cam.setIcon(icon));
     }
 
     public static BufferedImage matToBuff(final Mat processed){
